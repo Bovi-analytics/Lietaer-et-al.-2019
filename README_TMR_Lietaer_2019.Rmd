@@ -1,0 +1,504 @@
+---
+title: "R Notebook"
+output:
+  html_notebook: default
+  html_document: default
+---
+
+# Statistical analysis preface 
+Currently the following R packages were loaded
+
+```{r}
+library(readxl)
+
+library("reshape2")
+
+library("matrixStats")
+
+library(rpart)
+
+library(rattle)
+
+library(rpart.plot)
+
+library(RColorBrewer)
+
+library("FactoMineR")
+
+library("factoextra")
+
+library("lme4") 
+
+library("ggplot2")
+
+```
+
+
+# Data extraction, transformation and loading
+
+## TMR Data 
+
+```{r}
+TMR <- read.csv2("TMRAudits.csv")
+TMR$Total <- NULL
+TMR$Quantity <- NULL
+
+TMR_wide <- dcast(TMR, Herd + Sieve ~ Sample) ## reshape table - wide format
+TMR_wide[TMR_wide == "0"] <- NA
+
+TMR_wide$mean <- rowMeans(TMR_wide[,3:12], na.rm = TRUE) ## Mean Sample 1 - 10
+
+TMR_wide$diff <- (TMR_wide$refusals - TMR_wide$mean)/TMR_wide$mean ## relative difference between mean and orts
+
+TMR_matrix <- as.matrix(TMR_wide[,3:12])
+TMR_wide$sd <- rowSds(TMR_matrix, na.rm = TRUE) ## Standard deviation
+
+CV <- function(mean, sd) { (sd/mean)*100 }
+TMR_wide$cv <- CV(mean = TMR_wide$mean, sd = TMR_wide$sd) ## Coefficient of variation in TMR_wide$cv
+```
+
+### Making a new matrix with the means, cv, orts
+
+```{r}
+Herd <- matrix(TMR_wide$Herd, ncol = 3, byrow=TRUE)
+colnames(Herd) <- c("Herd1","Herd2", "Herd")
+
+mean <- matrix(TMR_wide$mean, ncol = 3, byrow = TRUE)
+colnames(mean) <- c("FRESH.mid.mean","FRESH.pan.mean", "FRESH.top.mean")
+
+cv <- matrix(TMR_wide$cv, ncol = 3, byrow = TRUE)
+colnames(cv) <- c("FRESH.mid.cv","FRESH.pan.cv", "FRESH.top.cv")
+
+diff <- matrix(TMR_wide$diff, ncol = 3, byrow = TRUE)
+colnames(diff) <- c("REFUSALS.mid","REFUSALS.pan", "REFUSALS.top")
+
+TMR_table <- data.frame(Herd, mean, cv, diff)
+TMR_table <- na.omit(TMR_table[,3:12])
+```
+
+```{r}
+summary(TMR_table)
+```
+
+```{r}
+sd(TMR_table$FRESH.pan.mean)
+sd(TMR_table$FRESH.mid.mean)
+sd(TMR_table$FRESH.top.mean)
+sd(TMR_table$FRESH.pan.cv)
+sd(TMR_table$FRESH.mid.cv)
+sd(TMR_table$FRESH.top.cv)
+sd(TMR_table$REFUSALS.pan)
+sd(TMR_table$REFUSALS.mid)
+sd(TMR_table$REFUSALS.top)
+```
+
+### Check normality
+```{r}
+TMR_table$FRESH.top.cv <- log(TMR_table$FRESH.top.cv)
+TMR_table$FRESH.mid.cv <- log(TMR_table$FRESH.mid.cv)
+TMR_table$FRESH.pan.cv <- log(TMR_table$FRESH.pan.cv)
+TMR_table$REFUSALS.top <- log(TMR_table$REFUSALS.top +1)
+
+par(mfrow = c(3,3))
+hist(TMR_table$FRESH.top.mean)
+hist(TMR_table$FRESH.mid.mean)
+hist(TMR_table$FRESH.pan.mean)
+hist(TMR_table$FRESH.top.cv)
+hist(TMR_table$FRESH.mid.cv)
+hist(TMR_table$FRESH.pan.cv)
+hist(TMR_table$REFUSALS.top)
+hist(TMR_table$REFUSALS.mid)
+hist(TMR_table$REFUSALS.pan)
+```
+
+```{r}
+par(mfrow = c(3,3))
+shapiro.test(TMR_table$FRESH.top.mean)
+qqnorm(TMR_table$FRESH.top.mean); qqline(TMR_table$FRESH.top.mean)
+shapiro.test(TMR_table$FRESH.mid.mean)
+qqnorm(TMR_table$FRESH.mid.mean); qqline(TMR_table$FRESH.mid.mean)
+shapiro.test(TMR_table$FRESH.pan.mean)
+qqnorm(TMR_table$FRESH.pan.mean); qqline(TMR_table$FRESH.pan.mean)
+shapiro.test(TMR_table$FRESH.top.cv)
+qqnorm(TMR_table$FRESH.top.cv); qqline(TMR_table$FRESH.top.cv)
+shapiro.test(TMR_table$FRESH.mid.cv)
+qqnorm(TMR_table$FRESH.mid.cv); qqline(TMR_table$FRESH.mid.cv)
+shapiro.test(TMR_table$FRESH.pan.cv)
+qqnorm(TMR_table$FRESH.pan.cv); qqline(TMR_table$FRESH.pan.cv)
+shapiro.test(TMR_table$REFUSALS.top)
+qqnorm(TMR_table$REFUSALS.top); qqline(TMR_table$REFUSALS.top)
+shapiro.test(TMR_table$REFUSALS.mid)
+qqnorm(TMR_table$REFUSALS.mid); qqline(TMR_table$REFUSALS.mid)
+shapiro.test(TMR_table$REFUSALS.pan)
+qqnorm(TMR_table$REFUSALS.pan); qqline(TMR_table$REFUSALS.pan)
+```
+
+## SURVEY
+
+```{r}
+ENQ_data <- read.csv2("SURVEY.csv")
+```
+
+## Making a new matrix with TMR and SURVEY + data manipulation
+
+```{r}
+DATASET1 <- merge(TMR_table, ENQ_data, by.x = "Herd", by.y = "HERD", all = FALSE)
+
+DATASET1$CONSERVATION_SCORE <- as.factor(DATASET1$CONSERVATION_SCORE)
+DATASET1$CONSERVATION <- as.factor(DATASET1$CONSERVATION)
+DATASET1$SPOILAGE <- as.factor(DATASET1$SPOILAGE)
+DATASET1$SCRAPING_SCORE <- as.factor(DATASET1$SCRAPING_SCORE)
+DATASET1$SCRAPING <- as.factor(DATASET1$SCRAPING)
+DATASET1$HOR_VERT_DRUM <- as.factor(DATASET1$HOR_VERT_DRUM)
+DATASET1$AUGER_SCORE <- as.factor(DATASET1$AUGER_SCORE)
+DATASET1$AUGER <- as.factor(DATASET1$AUGER)
+DATASET1$KNIVES_SCORE <- as.factor(DATASET1$KNIVES_SCORE)
+DATASET1$KNIVES <- as.factor(DATASET1$KNIVES)
+DATASET1$HAY_PROCESSING <- as.factor(DATASET1$HAY_PROCESSING)
+DATASET1$POSITION <- as.factor(DATASET1$POSITION)
+DATASET1$MIXING_START <- as.factor(DATASET1$MIXING_START)
+DATASET1$MIXING_AFTER_LAST_MIN <- as.factor(DATASET1$MIXING_AFTER_LAST_MIN)
+DATASET1$MIXING_AFTER_LAST <- as.factor(DATASET1$MIXING_AFTER_LAST)
+DATASET1$LIQUID <- as.factor(DATASET1$LIQUID)
+DATASET1$FILLING <- as.factor(DATASET1$FILLING)
+DATASET1$RPM <- as.factor(DATASET1$RPM)
+DATASET1$RPM_2 <- as.factor(DATASET1$RPM_2)
+DATASET1$MOVEMENT_SCORE <- as.factor(DATASET1$MOVEMENT_SCORE)
+DATASET1$MOVEMENT <- as.factor(DATASET1$MOVEMENT)
+DATASET1$EMPTY <- as.factor(DATASET1$EMPTY)
+```
+
+```{r}
+summary(DATASET1)
+```
+
+# Principal Component Analysis TMR
+
+```{r}
+TMR.pca <- prcomp(na.omit(DATASET1[,2:10]),
+                 center = TRUE,
+                 scale. = TRUE) 
+print(TMR.pca)
+```
+
+```{r}
+PREDICT_PCA <- as.data.frame(predict(TMR.pca))
+```
+
+```{r}
+plot(TMR.pca, type = "l")
+```
+
+```{r}
+summary(TMR.pca)
+```
+
+
+```{r}
+biplot(TMR.pca)
+
+fviz_pca_var(TMR.pca, col.var = "black")
+```
+
+# Regression Tree TMR + SURVEY
+
+## PC1
+
+```{r}
+fit <- rpart(PREDICT_PCA$PC1 ~ SPOILAGE + SCRAPING + HOR_VERT_DRUM + AUGER + KNIVES + HAY_PROCESSING + POSITION + MIXING_START + MIXING_AFTER_LAST + LIQUID + FILLING + RPM_2 + MOVEMENT + EMPTY, data = DATASET1, method="anova")
+
+printcp(fit) # display the results 
+plotcp(fit) # visualize cross-validation results 
+summary(fit) # detailed summary of splits
+
+# plot tree 
+fancyRpartPlot(fit)
+```
+
+## PC2
+
+```{r}
+fit <- rpart(PREDICT_PCA$PC2 ~ SPOILAGE + SCRAPING + HOR_VERT_DRUM + AUGER + KNIVES + HAY_PROCESSING + POSITION + MIXING_START + MIXING_AFTER_LAST + LIQUID + FILLING + RPM_2 + MOVEMENT + EMPTY, data = DATASET1, method="anova")
+
+printcp(fit) # display the results 
+plotcp(fit) # visualize cross-validation results 
+summary(fit) # detailed summary of splits
+
+# plot tree 
+fancyRpartPlot(fit)
+```
+
+# Factor Analysis of Mixed Data TMR + SURVEY
+
+```{r}
+datafamd <- na.omit(DATASET1[,c(2:10,        ## TMRaudit active
+                                   13,16,22,23,26,  ## active categorical variables
+                                   15,19,21,24,27,28,30,32,33         ## supplementary categorical variables 
+                                   )])
+
+datafamd$FRESH.top.mean <- scale((datafamd$FRESH.top.mean), center = TRUE, scale = TRUE)
+datafamd$FRESH.mid.mean <- scale((datafamd$FRESH.mid.mean), center = TRUE, scale = TRUE)
+datafamd$FRESH.pan.mean <- scale((datafamd$FRESH.pan.mean), center = TRUE, scale = TRUE)
+datafamd$FRESH.top.cv <- scale((datafamd$FRESH.top.cv), center = TRUE, scale = TRUE)
+datafamd$FRESH.mid.cv <- scale((datafamd$FRESH.mid.cv), center = TRUE, scale = TRUE)
+datafamd$FRESH.pan.cv <- scale((datafamd$FRESH.pan.cv), center = TRUE, scale = TRUE)
+datafamd$REFUSALS.top <- scale((datafamd$REFUSALS.top), center = TRUE, scale = TRUE)
+datafamd$REFUSALS.mid <- scale((datafamd$REFUSALS.mid), center = TRUE, scale = TRUE)
+datafamd$REFUSALS.pan <- scale((datafamd$REFUSALS.pan), center = TRUE, scale = TRUE)
+
+summary(datafamd)
+
+res.mfa <- FAMD(datafamd, graph=TRUE, sup.var=c(15:23))
+print(res.mfa)
+```
+
+```{r}
+eig.val <- get_eigenvalue(res.mfa)
+head(eig.val)
+```
+
+## visualisations
+
+```{r}
+fviz_screeplot(res.mfa)
+```
+
+```{r}
+# Contribution to the first dimension
+fviz_contrib(res.mfa, "var", 
+             axes = 1)
+```
+
+```{r}
+# Contribution to the second dimension
+fviz_contrib(res.mfa, "var", 
+             axes = 2)
+```
+
+```{r}
+quanti.var <- get_famd_var(res.mfa, "quanti.var")
+quanti.var 
+```
+
+```{r}
+fviz_famd_var(res.mfa, "quanti.var", col.var = "contrib", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE)
+```
+
+```{r}
+p <- fviz_famd_var(res.mfa, "quanti.var", label="none", col.var = "black")
+p
+
+p + annotate("text", x=.7, y=1.1, label=expression("FRESH"[TOP.MEAN]), size=3, angle=60) +
+  annotate("text", x=1, y=.5, label=expression("FRESH"[PAN.CV]), size=3, angle=30) +
+  annotate("text", x=1.1, y=.45, label=expression("FRESH"[MID.CV]), size=3, angle=25) +
+  annotate("text", x=.65, y=-.45, label=expression("FRESH"[TOP.CV]), size=3, angle=330) +
+  annotate("text", x=.75, y=-1, label=expression("REFUSALS"[TOP]), size=3, angle=310) +
+  annotate("text", x=-.3, y=-1, label=expression("FRESH"[PAN.MEAN]), size=3, angle=76) +
+  annotate("text", x=-0.8, y=-.65, label=expression("FRESH"[MID.MEAN]), size=3, angle=40) +
+  annotate("text", x=-.9, y=0.40, label=expression("REFUSALS"[PAN]), size=3, angle=340) +
+  annotate("text", x=-.95, y=0.7, label=expression("REFUSALS"[MID]), size=3, angle=330) +
+  expand_limits(x=c(-1.5,1.5), y=c(-1.5,1.5))
+
+```
+
+
+```{r}
+quali.var <- get_famd_var(res.mfa, "quali.var")
+quali.var 
+```
+
+```{r}
+plot(res.mfa, choix = "quali")
+```
+
+
+```{r}
+fviz_famd_var(res.mfa, "quali.var", repel = TRUE, col.var = "black")
+```
+
+```{r}
+fviz_famd_ind(res.mfa, col.ind = "cos2", geom=c("point", "text"),
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE, invisible = "quali.var")
+```
+
+```{r}
+fviz_ellipses(res.mfa, c("POSITION", "SPOILAGE", "HOR_VERT_DRUM", "HAY_PROCESSING", "MIXING_AFTER_LAST"), repel = TRUE)
+```
+
+# MPR + ENQ
+
+## Making a new matrix with MPR and SELECTED SURVEY VARIABLES
+
+```{r}
+MPR <- read.csv2("MPR_data.csv")
+summary(MPR)
+
+sd(MPR$COWS)
+sd(MPR$DIM)
+sd(MPR$KGMILK)
+sd(MPR$FPCM)
+sd(MPR$FAT)
+sd(MPR$PROTEIN)
+sd(MPR$KGFP)
+sd(na.omit(MPR$AGE_YEAR))
+
+par(mfrow = c(3,3))
+hist(MPR$DIM)
+hist(MPR$KGMILK)
+hist(MPR$FPCM)
+hist(MPR$FAT)
+hist(MPR$PROTEIN)
+hist(MPR$KGFP)
+hist(MPR$AGE_YEAR)
+```
+
+```{r}
+par(mfrow = c(3,3))
+shapiro.test(MPR$DIM)
+qqnorm(MPR$DIM); qqline(MPR$DIM)
+shapiro.test(MPR$KGMILK)
+qqnorm(MPR$KGMILK); qqline(MPR$KGMILK)
+shapiro.test(MPR$FPCM)
+qqnorm(MPR$FPCM); qqline(MPR$FPCM)
+shapiro.test(MPR$FAT)
+qqnorm(MPR$FAT); qqline(MPR$FAT)
+shapiro.test(MPR$PROTEIN)
+qqnorm(MPR$PROTEIN); qqline(MPR$PROTEIN)
+shapiro.test(MPR$KGFP)
+qqnorm(MPR$KGFP); qqline(MPR$KGFP)
+shapiro.test(MPR$AGE_YEAR)
+qqnorm(MPR$AGE_YEAR); qqline(MPR$AGE_YEAR)
+```
+
+```{r}
+DATASET2 <- merge(MPR, DATASET1, by.x= 'HERD', by.y= "Herd", all = FALSE)
+summary(DATASET2)
+
+sd(DATASET2$COWS)
+sd(DATASET2$DIM)
+sd(DATASET2$KGMILK)
+sd(DATASET2$FPCM)
+sd(DATASET2$FAT)
+sd(DATASET2$PROTEIN)
+sd(DATASET2$KGFP)
+sd(na.omit(DATASET2$AGE_YEAR))
+```
+
+
+```{r}
+DATASET2.pca <- prcomp(na.omit(DATASET2[,c(2:8,10,11:19)]),
+                 center = TRUE,
+                 scale. = TRUE) 
+print(DATASET2.pca)
+```
+
+```{r}
+summary(DATASET2.pca)
+
+PREDICT_PCAmilk <- as.data.frame(predict(DATASET2.pca))
+```
+
+## visualisations
+
+```{r}
+biplot(DATASET2.pca)
+
+fviz_pca_var(DATASET2.pca, col.var = "black")
+```
+
+```{r}
+p <- fviz_pca_biplot(DATASET2.pca, label="none", invisible ="ind", col.var = "black", xlim=c(-8, 8), ylim=c(-8, 8))
+p
+```
+
+```{r}
+p <- p + annotate("text", x=-0.15, y=6.2, label=expression("FRESH"[TOP.CV]), size=3, angle=274) +
+  annotate("text", x=-0.5, y=5.3, label=expression("FRESH"[PAN.MEAN]), size=3, angle=280) +
+  annotate("text", x=0.8, y=3.5, label=expression("COWS"), size=3, angle=70) +
+  annotate("text", x=1.5, y=3.5, label=expression("FRESH"[PAN.CV]), size=3, angle=55) +
+  annotate("text", x=2.75, y=2.1, label=expression("FRESH"[MID.CV]), size=3, angle=20) +
+  annotate("text", x=2.2, y=1.2, label=expression("DIM"), size=3, angle=18) +
+  annotate("text", x=3, y=.7, label=expression("PROTEIN"), size=3, angle=10) +
+  annotate("text", x=1.8, y=-2.5, label=expression("FAT"), size=3, angle=320) +
+  annotate("text", x=2.7, y=-5, label=expression("FRESH"[TOP.MEAN]), size=3, angle=315) +
+  annotate("text", x=1, y=-3.5, label=expression("REFUSALS"[MID]), size=3, angle=300) +
+  annotate("text", x=-1.8, y=-2.8, label=expression("AGE"), size=3, angle=50) +
+  annotate("text", x=-6, y=-.8, label=expression("FPCM; KGFP"), size=3, angle=5) +
+  annotate("text", x=-5.7, y=0, label=expression("KGMILK"), size=3, angle=0) +
+  annotate("text", x=-1.7, y=0.5, label=expression("REFUSALS"[PAN]), size=3, angle=0) +
+  annotate("text", x=-3.2, y=2.3, label=expression("FRESH"[MID.MEAN]), size=3, angle=345) +
+  annotate("text", x=-2.2, y=3.5, label=expression("REFUSALS"[TOP]), size=3, angle=320)
+
+p <- p + labs(x = "PC1 (21.4%)", y = "PC2 (16.3%)")
+p
+  
+```
+
+```{r}
+g <- fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), invisible = "var" , col.ind = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), xlim=c(-8, 8), ylim=c(-8, 8))
+g <- g + labs(x = "PC1 (21.4%)", y = "PC2 (16.3%)")
+print (g)
+
+```
+
+```{r}
+DATASETLAST <- DATASET2[-c(4,34), ]
+
+fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$SPOILAGE, palette = c("#00AFBB", "#FC4E07"), addEllipses = TRUE, invisible = "var", col.var = "black")
+
+```
+
+```{r}
+library(devtools)
+
+install_github("vqv/ggbiplot", force=TRUE)
+
+library(ggbiplot)
+
+
+g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1)
+g <- g + geom_point(aes(size = DATASETLAST$FPCM, color = DATASETLAST$SPOILAGE))
+g <- g + theme(legend.direction = 'horizontal', 
+               legend.position = 'top')
+g <- g + theme_minimal()
+print(g)
+
+g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1, var.axes=FALSE) +
+  geom_point(aes(size = DATASETLAST$FPCM, color = DATASETLAST$SPOILAGE)) +
+  theme(legend.direction = 'horizontal', legend.position = 'top') +
+  scale_size_continuous(name = "FPCM (kg)") +
+  scale_color_manual(values = c("#00AFBB", "#FC4E07"), name = "Spoilage") +
+  labs(x = "PC1 (21.4%)", y = "PC2 (16.3%)") + 
+  theme_minimal()
+print(g)
+```
+
+
+```{r}
+fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$POSITION, palette = c("#FC4E07", "#00AFBB"), addEllipses = TRUE, invisible = "var", col.var = "black")
+```
+
+```{r}
+g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1, var.axes=FALSE) +
+  geom_point(aes(size = DATASETLAST$FPCM, color = DATASETLAST$POSITION)) +
+  theme(legend.direction = 'horizontal', legend.position = 'top') +
+  scale_size_continuous(name = "FPCM (kg)") +
+  scale_color_manual (values = c("#FC4E07", "#00AFBB"), name = "Position", 
+                      breaks=c("Good position", "Bad position")) +
+  labs(x = "PC1 (21.4%)", y = "PC2 (16.3%)") + 
+  theme_minimal()
+print(g)
+```
+
+
+```{r}
+fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$MIXING_AFTER_LAST , addEllipses = TRUE, ellipse.type = "confidence", invisible = "var", label = "ind" , col.var = "black")
+```
+
+```{r}
+fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$MOVEMENT, addEllipses = TRUE, ellipse.type = "confidence", label = "ind" , invisible = "var", col.var = "black")
+```
