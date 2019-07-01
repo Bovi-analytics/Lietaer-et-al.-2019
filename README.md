@@ -1,4 +1,4 @@
-TMR in Flanders
+TMR in Belgium & the Netherlands
 ================
 
   - [Statistical analysis preface](#statistical-analysis-preface)
