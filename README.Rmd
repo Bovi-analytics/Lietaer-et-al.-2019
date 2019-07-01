@@ -8,40 +8,81 @@ editor_options:
   chunk_output_type: console
 ---
 
-# Statistical analysis preface 
-Currently the following R packages were loaded
+This is an R Markdown Notebook for the TMR data of Leen Lietaer. When you execute code within the notebook, the results appear beneath the code.
 
-```{r }
-library(readxl)
+First we need to load libraries. These are small packages of software we will use during our analysis.
 
-library("reshape2")
+```{r}
+if (!require("readxl")) {
+  install.packages("readxl", dependencies = TRUE)
+  library(readxl)
+}
 
-library("matrixStats")
+if (!require("reshape2")) {
+  install.packages("reshape2", dependencies = TRUE)
+  library(reshape2)
+}
 
-library(rpart)
+if (!require("matrixStats")) {
+  install.packages("matrixStats", dependencies = TRUE)
+  library(matrixStats)
+}
 
-library(rattle)
+if (!require("rpart")) {
+  install.packages("rpart", dependencies = TRUE)
+  library(rpart)
+}
 
-library(rpart.plot)
+if (!require("rattle")) {
+  install.packages("rattle", dependencies = TRUE)
+  library(rattle)
+}
 
-library(RColorBrewer)
+if (!require("rpart.plot")) {
+  install.packages("rpart.plot", dependencies = TRUE)
+  library(rpart.plot)
+}
 
-library("FactoMineR")
+if (!require("RColorBrewer")) {
+  install.packages("RColorBrewer", dependencies = TRUE)
+  library(RColorBrewer)
+}
 
-library("factoextra")
+if (!require("FactoMineR")) {
+  install.packages("FactoMineR", dependencies = TRUE)
+  library(FactoMineR)
+}
 
-library("lme4") 
+if (!require("factoextra")) {
+  install.packages("factoextra", dependencies = TRUE)
+  library(factoextra)
+}
 
-library("ggplot2")
+if (!require("lme4")) {
+  install.packages("lme4", dependencies = TRUE)
+  library(lme4)
+}
 
-library(devtools)
+if (!require("ggplot2")) {
+  install.packages("ggplot2", dependencies = TRUE)
+  library(ggplot2)
+}
 
-#install_github("vqv/ggbiplot", force=TRUE)
+if (!require("devtools")) {
+  install.packages("devtools", dependencies = TRUE)
+  library(devtools)
+} 
 
-library(ggbiplot)
+if (!require("ggbiplot")) {
+  install_github("vqv/ggbiplot", force=TRUE)
+  library(ggbiplot)
+}
 
+if (!require("forcats")) {
+  install.packages("forcats", force=TRUE)
+  library(forcats)
+}
 ```
-
 
 # Data extraction, transformation and loading
 
@@ -204,9 +245,6 @@ screenlabs <- c(expression("FRESH"[TOP.MEAN]), expression("FRESH"[MID.MEAN]), ex
 ```
 
 ```{r}
-library(ggplot2)
-library(forcats)
-
 ggplot(data=PC1PC2, aes(x=fct_rev(screen), y=PC1)) +
   scale_x_discrete(labels= rev(screenlabs)) +
   xlab("") + ylab("") +
