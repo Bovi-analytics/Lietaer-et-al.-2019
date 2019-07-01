@@ -1,8 +1,11 @@
 ---
-title: "R Notebook"
-output:
-  html_document: default
-  html_notebook: default
+title: "TMR in Flanders"
+output: 
+  github_document:
+    toc: true
+    toc_depth: 3
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Statistical analysis preface 
