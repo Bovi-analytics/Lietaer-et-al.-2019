@@ -1,5 +1,5 @@
 ---
-title: "TMR in Flanders"
+title: "Total Mixed Ration Characteristics In Dairy Cows"
 output: 
   github_document:
     toc: true
@@ -11,7 +11,7 @@ editor_options:
 # Statistical analysis preface 
 Currently the following R packages were loaded
 
-```{r}
+```{r }
 library(readxl)
 
 library("reshape2")
@@ -33,6 +33,12 @@ library("factoextra")
 library("lme4") 
 
 library("ggplot2")
+
+library(devtools)
+
+#install_github("vqv/ggbiplot", force=TRUE)
+
+library(ggbiplot)
 
 ```
 
@@ -182,6 +188,44 @@ TMR.pca <- prcomp(na.omit(DATASET1[,2:10]),
                  center = TRUE,
                  scale. = TRUE) 
 print(TMR.pca)
+```
+
+```{r}
+PC1PC2 <- read.csv2("PC1 and PC2 bar chart data.csv",dec = ".")
+  
+PC1PC2$PC1 <- as.numeric(PC1PC2$PC1)
+PC1PC2$PC2 <- as.numeric(PC1PC2$PC2)
+PC1PC2$screen <- factor(PC1PC2$Groups, levels= c("FRESHTOP,MEAN", "FRESHMID,MEAN", "FRESHPAN,MEAN", "FRESHTOP,CV", "FRESHMID,CV", "FRESHPAN,CV", "REFUSALSTOP", "REFUSALSMID", "REFUSALSPAN")) 
+
+screenlabs <- c(expression("FRESH"[TOP.MEAN]), expression("FRESH"[MID.MEAN]), expression("FRESH"[PAN.MEAN]), 
+                expression("FRESH"[TOP.CV]), expression("FRESH"[MID.CV]), expression("FRESH"[PAN.CV]), 
+                expression("REFUSALS"[TOP]), expression("REFUSALS"[MID]), expression("REFUSALS"[PAN]))
+
+```
+
+```{r}
+library(ggplot2)
+library(forcats)
+
+ggplot(data=PC1PC2, aes(x=fct_rev(screen), y=PC1)) +
+  scale_x_discrete(labels= rev(screenlabs)) +
+  xlab("") + ylab("") +
+  geom_bar(position="dodge", stat="identity", fill="steelblue") +
+  ylim(-0.6, 0.6) +
+  coord_flip() +
+  ggtitle("PC1") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data=PC1PC2, aes(x=fct_rev(screen), y=PC2)) +
+  scale_x_discrete(labels= rev(screenlabs)) +
+  xlab("") + ylab("") +
+  geom_bar(position="dodge", stat="identity", fill="#009900") +
+  ylim(-0.6, 0.6) +
+  coord_flip() +
+  ggtitle("PC2") +
+  theme_minimal()
 ```
 
 ```{r}
@@ -407,6 +451,19 @@ PREDICT_PCAmilk <- as.data.frame(predict(DATASET2.pca))
 ## visualisations
 
 ```{r}
+# Contribution to PC1
+fviz_contrib(DATASET2.pca, "var", 
+             axes = 1)
+```
+
+```{r}
+# Contribution to PC2
+fviz_contrib(DATASET2.pca, "var", 
+             axes = 2)
+```
+
+
+```{r}
 biplot(DATASET2.pca)
 
 fviz_pca_var(DATASET2.pca, col.var = "black")
@@ -456,13 +513,6 @@ fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$S
 ```
 
 ```{r}
-library(devtools)
-
-install_github("vqv/ggbiplot", force=TRUE)
-
-library(ggbiplot)
-
-
 g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1)
 g <- g + geom_point(aes(size = DATASETLAST$FPCM, color = DATASETLAST$SPOILAGE))
 g <- g + theme(legend.direction = 'horizontal', 

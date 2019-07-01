@@ -1,30 +1,25 @@
-TMR in Belgium & the Netherlands
+Total Mixed Ration Characteristics In Dairy Cows
 ================
 
-  - [Statistical analysis preface](#statistical-analysis-preface)
-  - [Data extraction, transformation and
-    loading](#data-extraction-transformation-and-loading)
-      - [TMR Data](#tmr-data)
-          - [Making a new matrix with the means, cv,
-            orts](#making-a-new-matrix-with-the-means-cv-orts)
-          - [Check normality](#check-normality)
-      - [SURVEY](#survey)
-      - [Making a new matrix with TMR and SURVEY + data
-        manipulation](#making-a-new-matrix-with-tmr-and-survey-data-manipulation)
-  - [Principal Component Analysis
-    TMR](#principal-component-analysis-tmr)
-  - [Regression Tree TMR + SURVEY](#regression-tree-tmr-survey)
-      - [PC1](#pc1)
-      - [PC2](#pc2)
-  - [Factor Analysis of Mixed Data TMR +
-    SURVEY](#factor-analysis-of-mixed-data-tmr-survey)
-      - [visualisations](#visualisations)
-  - [MPR + ENQ](#mpr-enq)
-      - [Making a new matrix with MPR and SELECTED SURVEY
-        VARIABLES](#making-a-new-matrix-with-mpr-and-selected-survey-variables)
-      - [visualisations](#visualisations-1)
+-   [Statistical analysis preface](#statistical-analysis-preface)
+-   [Data extraction, transformation and loading](#data-extraction-transformation-and-loading)
+    -   [TMR Data](#tmr-data)
+        -   [Making a new matrix with the means, cv, orts](#making-a-new-matrix-with-the-means-cv-orts)
+        -   [Check normality](#check-normality)
+    -   [SURVEY](#survey)
+    -   [Making a new matrix with TMR and SURVEY + data manipulation](#making-a-new-matrix-with-tmr-and-survey-data-manipulation)
+-   [Principal Component Analysis TMR](#principal-component-analysis-tmr)
+-   [Regression Tree TMR + SURVEY](#regression-tree-tmr-survey)
+    -   [PC1](#pc1)
+    -   [PC2](#pc2)
+-   [Factor Analysis of Mixed Data TMR + SURVEY](#factor-analysis-of-mixed-data-tmr-survey)
+    -   [visualisations](#visualisations)
+-   [MPR + ENQ](#mpr-enq)
+    -   [Making a new matrix with MPR and SELECTED SURVEY VARIABLES](#making-a-new-matrix-with-mpr-and-selected-survey-variables)
+    -   [visualisations](#visualisations-1)
 
-# Statistical analysis preface
+Statistical analysis preface
+============================
 
 Currently the following R packages were loaded
 
@@ -56,6 +51,12 @@ library("factoextra")
 
     ## Loading required package: ggplot2
 
+    ## Registered S3 methods overwritten by 'ggplot2':
+    ##   method         from 
+    ##   [.quosures     rlang
+    ##   c.quosures     rlang
+    ##   print.quosures rlang
+
     ## Welcome! Related Books: `Practical Guide To Cluster Analysis in R` at https://goo.gl/13EFCZ
 
 ``` r
@@ -66,11 +67,32 @@ library("lme4")
 
 ``` r
 library("ggplot2")
+
+library(devtools)
+
+#install_github("vqv/ggbiplot", force=TRUE)
+
+library(ggbiplot)
 ```
 
-# Data extraction, transformation and loading
+    ## Loading required package: plyr
 
-## TMR Data
+    ## 
+    ## Attaching package: 'plyr'
+
+    ## The following object is masked from 'package:matrixStats':
+    ## 
+    ##     count
+
+    ## Loading required package: scales
+
+    ## Loading required package: grid
+
+Data extraction, transformation and loading
+===========================================
+
+TMR Data
+--------
 
 ``` r
 TMR <- read.csv2("TMRAudits.csv")
@@ -218,7 +240,7 @@ hist(TMR_table$REFUSALS.mid)
 hist(TMR_table$REFUSALS.pan)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-6-1.png)
 
 ``` r
 par(mfrow = c(3,3))
@@ -323,15 +345,17 @@ shapiro.test(TMR_table$REFUSALS.pan)
 qqnorm(TMR_table$REFUSALS.pan); qqline(TMR_table$REFUSALS.pan)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-7-1.png)
 
-## SURVEY
+SURVEY
+------
 
 ``` r
 ENQ_data <- read.csv2("SURVEY.csv")
 ```
 
-## Making a new matrix with TMR and SURVEY + data manipulation
+Making a new matrix with TMR and SURVEY + data manipulation
+-----------------------------------------------------------
 
 ``` r
 DATASET1 <- merge(TMR_table, ENQ_data, by.x = "Herd", by.y = "HERD", all = FALSE)
@@ -445,7 +469,8 @@ summary(DATASET1)
     ##                                         
     ## 
 
-# Principal Component Analysis TMR
+Principal Component Analysis TMR
+================================
 
 ``` r
 TMR.pca <- prcomp(na.omit(DATASET1[,2:10]),
@@ -491,6 +516,47 @@ print(TMR.pca)
     ## REFUSALS.top    3.365144e-11
 
 ``` r
+PC1PC2 <- read.csv2("PC1 and PC2 bar chart data.csv",dec = ".")
+  
+PC1PC2$PC1 <- as.numeric(PC1PC2$PC1)
+PC1PC2$PC2 <- as.numeric(PC1PC2$PC2)
+PC1PC2$screen <- factor(PC1PC2$Groups, levels= c("FRESHTOP,MEAN", "FRESHMID,MEAN", "FRESHPAN,MEAN", "FRESHTOP,CV", "FRESHMID,CV", "FRESHPAN,CV", "REFUSALSTOP", "REFUSALSMID", "REFUSALSPAN")) 
+
+screenlabs <- c(expression("FRESH"[TOP.MEAN]), expression("FRESH"[MID.MEAN]), expression("FRESH"[PAN.MEAN]), 
+                expression("FRESH"[TOP.CV]), expression("FRESH"[MID.CV]), expression("FRESH"[PAN.CV]), 
+                expression("REFUSALS"[TOP]), expression("REFUSALS"[MID]), expression("REFUSALS"[PAN]))
+```
+
+``` r
+library(ggplot2)
+library(forcats)
+
+ggplot(data=PC1PC2, aes(x=fct_rev(screen), y=PC1)) +
+  scale_x_discrete(labels= rev(screenlabs)) +
+  xlab("") + ylab("") +
+  geom_bar(position="dodge", stat="identity", fill="steelblue") +
+  ylim(-0.6, 0.6) +
+  coord_flip() +
+  ggtitle("PC1") +
+  theme_minimal()
+```
+
+![](README_files/figure-markdown_github/unnamed-chunk-13-1.png)
+
+``` r
+ggplot(data=PC1PC2, aes(x=fct_rev(screen), y=PC2)) +
+  scale_x_discrete(labels= rev(screenlabs)) +
+  xlab("") + ylab("") +
+  geom_bar(position="dodge", stat="identity", fill="#009900") +
+  ylim(-0.6, 0.6) +
+  coord_flip() +
+  ggtitle("PC2") +
+  theme_minimal()
+```
+
+![](README_files/figure-markdown_github/unnamed-chunk-14-1.png)
+
+``` r
 PREDICT_PCA <- as.data.frame(predict(TMR.pca))
 ```
 
@@ -498,7 +564,7 @@ PREDICT_PCA <- as.data.frame(predict(TMR.pca))
 plot(TMR.pca, type = "l")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-16-1.png)
 
 ``` r
 summary(TMR.pca)
@@ -518,17 +584,19 @@ summary(TMR.pca)
 biplot(TMR.pca)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-18-1.png)
 
 ``` r
 fviz_pca_var(TMR.pca, col.var = "black")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-15-2.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-18-2.png)
 
-# Regression Tree TMR + SURVEY
+Regression Tree TMR + SURVEY
+============================
 
-## PC1
+PC1
+---
 
 ``` r
 fit <- rpart(PREDICT_PCA$PC1 ~ SPOILAGE + SCRAPING + HOR_VERT_DRUM + AUGER + KNIVES + HAY_PROCESSING + POSITION + MIXING_START + MIXING_AFTER_LAST + LIQUID + FILLING + RPM_2 + MOVEMENT + EMPTY, data = DATASET1, method="anova")
@@ -551,15 +619,15 @@ printcp(fit) # display the results
     ## n= 63 
     ## 
     ##         CP nsplit rel error xerror    xstd
-    ## 1 0.062608      0   1.00000 1.0316 0.22902
-    ## 2 0.015942      2   0.87478 1.2093 0.27569
-    ## 3 0.010000      4   0.84290 1.2836 0.28327
+    ## 1 0.062608      0   1.00000 1.0256 0.22579
+    ## 2 0.015942      2   0.87478 1.2657 0.28410
+    ## 3 0.010000      4   0.84290 1.3120 0.27663
 
 ``` r
 plotcp(fit) # visualize cross-validation results 
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-19-1.png)
 
 ``` r
 summary(fit) # detailed summary of splits
@@ -573,9 +641,9 @@ summary(fit) # detailed summary of splits
     ##   n= 63 
     ## 
     ##           CP nsplit rel error   xerror      xstd
-    ## 1 0.06260792      0 1.0000000 1.031569 0.2290194
-    ## 2 0.01594223      2 0.8747842 1.209272 0.2756929
-    ## 3 0.01000000      4 0.8428997 1.283607 0.2832719
+    ## 1 0.06260792      0 1.0000000 1.025601 0.2257901
+    ## 2 0.01594223      2 0.8747842 1.265704 0.2841047
+    ## 3 0.01000000      4 0.8428997 1.312001 0.2766282
     ## 
     ## Variable importance
     ##             RPM_2          POSITION MIXING_AFTER_LAST           FILLING 
@@ -653,9 +721,10 @@ summary(fit) # detailed summary of splits
 fancyRpartPlot(fit)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-16-2.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-19-2.png)
 
-## PC2
+PC2
+---
 
 ``` r
 fit <- rpart(PREDICT_PCA$PC2 ~ SPOILAGE + SCRAPING + HOR_VERT_DRUM + AUGER + KNIVES + HAY_PROCESSING + POSITION + MIXING_START + MIXING_AFTER_LAST + LIQUID + FILLING + RPM_2 + MOVEMENT + EMPTY, data = DATASET1, method="anova")
@@ -678,17 +747,17 @@ printcp(fit) # display the results
     ## n= 63 
     ## 
     ##         CP nsplit rel error  xerror    xstd
-    ## 1 0.203115      0   1.00000 1.02798 0.17788
-    ## 2 0.065804      1   0.79688 0.84124 0.13910
-    ## 3 0.045003      2   0.73108 0.88400 0.15584
-    ## 4 0.012389      3   0.68608 0.89736 0.16649
-    ## 5 0.010000      4   0.67369 0.92534 0.17208
+    ## 1 0.203115      0   1.00000 1.01755 0.17454
+    ## 2 0.065804      1   0.79688 0.91555 0.15475
+    ## 3 0.045003      2   0.73108 0.96772 0.16471
+    ## 4 0.012389      3   0.68608 0.91056 0.16670
+    ## 5 0.010000      4   0.67369 0.92529 0.16911
 
 ``` r
 plotcp(fit) # visualize cross-validation results 
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-20-1.png)
 
 ``` r
 summary(fit) # detailed summary of splits
@@ -702,11 +771,11 @@ summary(fit) # detailed summary of splits
     ##   n= 63 
     ## 
     ##           CP nsplit rel error    xerror      xstd
-    ## 1 0.20311544      0 1.0000000 1.0279826 0.1778781
-    ## 2 0.06580422      1 0.7968846 0.8412369 0.1390964
-    ## 3 0.04500310      2 0.7310803 0.8840001 0.1558352
-    ## 4 0.01238903      3 0.6860772 0.8973642 0.1664876
-    ## 5 0.01000000      4 0.6736882 0.9253431 0.1720774
+    ## 1 0.20311544      0 1.0000000 1.0175541 0.1745356
+    ## 2 0.06580422      1 0.7968846 0.9155470 0.1547527
+    ## 3 0.04500310      2 0.7310803 0.9677229 0.1647150
+    ## 4 0.01238903      3 0.6860772 0.9105586 0.1667039
+    ## 5 0.01000000      4 0.6736882 0.9252927 0.1691123
     ## 
     ## Variable importance
     ##          SPOILAGE          SCRAPING     HOR_VERT_DRUM MIXING_AFTER_LAST 
@@ -789,9 +858,10 @@ summary(fit) # detailed summary of splits
 fancyRpartPlot(fit)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-17-2.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-20-2.png)
 
-# Factor Analysis of Mixed Data TMR + SURVEY
+Factor Analysis of Mixed Data TMR + SURVEY
+==========================================
 
 ``` r
 datafamd <- na.omit(DATASET1[,c(2:10,        ## TMRaudit active
@@ -866,7 +936,7 @@ summary(datafamd)
 res.mfa <- FAMD(datafamd, graph=TRUE, sup.var=c(15:23))
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-18-2.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-18-3.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-18-4.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-18-5.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-21-1.png)![](README_files/figure-markdown_github/unnamed-chunk-21-2.png)![](README_files/figure-markdown_github/unnamed-chunk-21-3.png)![](README_files/figure-markdown_github/unnamed-chunk-21-4.png)![](README_files/figure-markdown_github/unnamed-chunk-21-5.png)
 
 ``` r
 print(res.mfa)
@@ -893,13 +963,14 @@ head(eig.val)
     ## Dim.4   1.308376         8.722503                    63.04455
     ## Dim.5   1.155183         7.701223                    70.74577
 
-## visualisations
+visualisations
+--------------
 
 ``` r
 fviz_screeplot(res.mfa)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-23-1.png)
 
 ``` r
 # Contribution to the first dimension
@@ -907,7 +978,7 @@ fviz_contrib(res.mfa, "var",
              axes = 1)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-24-1.png)
 
 ``` r
 # Contribution to the second dimension
@@ -915,7 +986,7 @@ fviz_contrib(res.mfa, "var",
              axes = 2)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-25-1.png)
 
 ``` r
 quanti.var <- get_famd_var(res.mfa, "quanti.var")
@@ -935,14 +1006,14 @@ fviz_famd_var(res.mfa, "quanti.var", col.var = "contrib",
              repel = TRUE)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-27-1.png)
 
 ``` r
 p <- fviz_famd_var(res.mfa, "quanti.var", label="none", col.var = "black")
 p
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-28-1.png)
 
 ``` r
 p + annotate("text", x=.7, y=1.1, label=expression("FRESH"[TOP.MEAN]), size=3, angle=60) +
@@ -959,32 +1030,32 @@ p + annotate("text", x=.7, y=1.1, label=expression("FRESH"[TOP.MEAN]), size=3, a
 
     ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
     ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
+
     ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
     ## 'expression'
 
-![](README_files/figure-gfm/unnamed-chunk-25-2.png)<!-- -->
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+![](README_files/figure-markdown_github/unnamed-chunk-28-2.png)
 
 ``` r
 quali.var <- get_famd_var(res.mfa, "quali.var")
@@ -1002,13 +1073,13 @@ quali.var
 plot(res.mfa, choix = "quali")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-30-1.png)
 
 ``` r
 fviz_famd_var(res.mfa, "quali.var", repel = TRUE, col.var = "black")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-31-1.png)
 
 ``` r
 fviz_famd_ind(res.mfa, col.ind = "cos2", geom=c("point", "text"),
@@ -1016,17 +1087,19 @@ fviz_famd_ind(res.mfa, col.ind = "cos2", geom=c("point", "text"),
              repel = TRUE, invisible = "quali.var")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-32-1.png)
 
 ``` r
 fviz_ellipses(res.mfa, c("POSITION", "SPOILAGE", "HOR_VERT_DRUM", "HAY_PROCESSING", "MIXING_AFTER_LAST"), repel = TRUE)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-33-1.png)
 
-# MPR + ENQ
+MPR + ENQ
+=========
 
-## Making a new matrix with MPR and SELECTED SURVEY VARIABLES
+Making a new matrix with MPR and SELECTED SURVEY VARIABLES
+----------------------------------------------------------
 
 ``` r
 MPR <- read.csv2("MPR_data.csv")
@@ -1117,7 +1190,7 @@ hist(MPR$KGFP)
 hist(MPR$AGE_YEAR)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-31-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-34-1.png)
 
 ``` r
 par(mfrow = c(3,3))
@@ -1200,7 +1273,7 @@ shapiro.test(MPR$AGE_YEAR)
 qqnorm(MPR$AGE_YEAR); qqline(MPR$AGE_YEAR)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-32-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-35-1.png)
 
 ``` r
 DATASET2 <- merge(MPR, DATASET1, by.x= 'HERD', by.y= "Herd", all = FALSE)
@@ -1479,26 +1552,43 @@ summary(DATASET2.pca)
 PREDICT_PCAmilk <- as.data.frame(predict(DATASET2.pca))
 ```
 
-## visualisations
+visualisations
+--------------
+
+``` r
+# Contribution to PC1
+fviz_contrib(DATASET2.pca, "var", 
+             axes = 1)
+```
+
+![](README_files/figure-markdown_github/unnamed-chunk-39-1.png)
+
+``` r
+# Contribution to PC2
+fviz_contrib(DATASET2.pca, "var", 
+             axes = 2)
+```
+
+![](README_files/figure-markdown_github/unnamed-chunk-40-1.png)
 
 ``` r
 biplot(DATASET2.pca)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-36-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-41-1.png)
 
 ``` r
 fviz_pca_var(DATASET2.pca, col.var = "black")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-36-2.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-41-2.png)
 
 ``` r
 p <- fviz_pca_biplot(DATASET2.pca, label="none", invisible ="ind", col.var = "black", xlim=c(-8, 8), ylim=c(-8, 8))
 p
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-37-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-42-1.png)
 
 ``` r
 p <- p + annotate("text", x=-0.15, y=6.2, label=expression("FRESH"[TOP.CV]), size=3, angle=274) +
@@ -1524,53 +1614,53 @@ p
 
     ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
     ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
-    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
-    ## 'expression'
-    
+
     ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
     ## 'expression'
 
-![](README_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+    ## Warning in is.na(x): is.na() applied to non-(list or vector) of type
+    ## 'expression'
+
+![](README_files/figure-markdown_github/unnamed-chunk-43-1.png)
 
 ``` r
 g <- fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), invisible = "var" , col.ind = "contrib",
@@ -1579,7 +1669,7 @@ g <- g + labs(x = "PC1 (21.4%)", y = "PC2 (16.3%)")
 print (g)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-39-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-44-1.png)
 
 ``` r
 DATASETLAST <- DATASET2[-c(4,34), ]
@@ -1590,87 +1680,10 @@ fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$S
     ## Too few points to calculate an ellipse
 
     ## Warning: Removed 1 rows containing missing values (geom_point).
-    
+
     ## Warning: Removed 1 rows containing missing values (geom_point).
 
-![](README_files/figure-gfm/unnamed-chunk-40-1.png)<!-- -->
-
-``` r
-library(devtools)
-
-install_github("vqv/ggbiplot", force=TRUE)
-```
-
-    ## Downloading GitHub repo vqv/ggbiplot@master
-
-    ## WARNING: Rtools is required to build R packages, but is not currently installed.
-    ## 
-    ## Please download and install Rtools 3.5 from http://cran.r-project.org/bin/windows/Rtools/.
-
-    ##   
-      
-      
-       checking for file 'C:\Users\matth\AppData\Local\Temp\RtmpIBsqor\remotes17f434ab7f7e\vqv-ggbiplot-7325e88/DESCRIPTION' ...
-      
-       checking for file 'C:\Users\matth\AppData\Local\Temp\RtmpIBsqor\remotes17f434ab7f7e\vqv-ggbiplot-7325e88/DESCRIPTION' ... 
-      
-    v  checking for file 'C:\Users\matth\AppData\Local\Temp\RtmpIBsqor\remotes17f434ab7f7e\vqv-ggbiplot-7325e88/DESCRIPTION' (2.5s)
-    ## 
-      
-      
-      
-    -  preparing 'ggbiplot':
-    ## 
-      
-       checking DESCRIPTION meta-information ...
-      
-       checking DESCRIPTION meta-information ... 
-      
-    v  checking DESCRIPTION meta-information
-    ## 
-      
-      
-      
-    -  checking for LF line-endings in source and make files and shell scripts
-    ## 
-      
-      
-      
-    -  checking for empty or unneeded directories
-    ## 
-      
-      
-      
-    -  looking to see if a 'data/datalist' file should be added
-    ## 
-      
-      
-      
-    -  building 'ggbiplot_0.55.tar.gz'
-    ## 
-      
-       
-    ## 
-
-    ## Installing package into 'C:/Users/matth/Documents/R/win-library/3.6'
-    ## (as 'lib' is unspecified)
-
-``` r
-library(ggbiplot)
-```
-
-    ## Loading required package: plyr
-
-    ## 
-    ## Attaching package: 'plyr'
-
-    ## The following object is masked from 'package:matrixStats':
-    ## 
-    ##     count
-
-    ## Loading required package: scales
-
-    ## Loading required package: grid
+![](README_files/figure-markdown_github/unnamed-chunk-45-1.png)
 
 ``` r
 g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1)
@@ -1681,7 +1694,7 @@ g <- g + theme_minimal()
 print(g)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-41-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-46-1.png)
 
 ``` r
 g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1, var.axes=FALSE) +
@@ -1696,13 +1709,13 @@ print(g)
 
     ## Warning: Removed 1 rows containing missing values (geom_point).
 
-![](README_files/figure-gfm/unnamed-chunk-41-2.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-46-2.png)
 
 ``` r
 fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$POSITION, palette = c("#FC4E07", "#00AFBB"), addEllipses = TRUE, invisible = "var", col.var = "black")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-42-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-47-1.png)
 
 ``` r
 g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1, var.axes=FALSE) +
@@ -1716,7 +1729,7 @@ g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1, var.
 print(g)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-43-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-48-1.png)
 
 ``` r
 fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$MIXING_AFTER_LAST , addEllipses = TRUE, ellipse.type = "confidence", invisible = "var", label = "ind" , col.var = "black")
@@ -1726,13 +1739,13 @@ fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$M
     ## missing value where TRUE/FALSE needed
 
     ## Warning: Removed 1 rows containing missing values (geom_point).
-    
+
     ## Warning: Removed 1 rows containing missing values (geom_point).
 
-![](README_files/figure-gfm/unnamed-chunk-44-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-49-1.png)
 
 ``` r
 fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$MOVEMENT, addEllipses = TRUE, ellipse.type = "confidence", label = "ind" , invisible = "var", col.var = "black")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-45-1.png)<!-- -->
+![](README_files/figure-markdown_github/unnamed-chunk-50-1.png)
