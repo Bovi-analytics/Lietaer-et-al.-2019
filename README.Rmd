@@ -84,9 +84,10 @@ if (!require("forcats")) {
 }
 ```
 
-# Data extraction, transformation and loading
+TMR Consistency Data
+====================
 
-## TMR Data 
+## Importing the TMR Consistency Data
 
 ```{r}
 TMR <- read.csv2("TMRAudits.csv")
@@ -96,18 +97,18 @@ TMR$Quantity <- NULL
 TMR_wide <- dcast(TMR, Herd + Sieve ~ Sample) ## reshape table - wide format
 TMR_wide[TMR_wide == "0"] <- NA
 
-TMR_wide$mean <- rowMeans(TMR_wide[,3:12], na.rm = TRUE) ## Mean Sample 1 - 10
+TMR_wide$mean <- rowMeans(TMR_wide[,3:12], na.rm = TRUE) ## Herd mean of fresh sample 1 to 10
 
-TMR_wide$diff <- (TMR_wide$refusals - TMR_wide$mean)/TMR_wide$mean ## relative difference between mean and orts
+TMR_wide$diff <- (TMR_wide$refusals - TMR_wide$mean)/TMR_wide$mean ## relative difference between mean and refusals
 
 TMR_matrix <- as.matrix(TMR_wide[,3:12])
-TMR_wide$sd <- rowSds(TMR_matrix, na.rm = TRUE) ## Standard deviation
+TMR_wide$sd <- rowSds(TMR_matrix, na.rm = TRUE) ## Standard deviation of fresh sample 1 to 10
 
 CV <- function(mean, sd) { (sd/mean)*100 }
-TMR_wide$cv <- CV(mean = TMR_wide$mean, sd = TMR_wide$sd) ## Coefficient of variation in TMR_wide$cv
+TMR_wide$cv <- CV(mean = TMR_wide$mean, sd = TMR_wide$sd) ## Coefficient of variation
 ```
 
-### Making a new matrix with the means, cv, orts
+Making a new matrix with the mean, cv and relative difference between mean and refusals
 
 ```{r}
 Herd <- matrix(TMR_wide$Herd, ncol = 3, byrow=TRUE)
@@ -126,6 +127,8 @@ TMR_table <- data.frame(Herd, mean, cv, diff)
 TMR_table <- na.omit(TMR_table[,3:12])
 ```
 
+## Exploring the TMR Consistency Data
+
 ```{r}
 summary(TMR_table)
 ```
@@ -142,7 +145,8 @@ sd(TMR_table$REFUSALS.mid)
 sd(TMR_table$REFUSALS.top)
 ```
 
-### Check normality
+Checking normality of the TMR Consistency Data
+
 ```{r}
 TMR_table$FRESH.top.cv <- log(TMR_table$FRESH.top.cv)
 TMR_table$FRESH.mid.cv <- log(TMR_table$FRESH.mid.cv)
@@ -183,13 +187,20 @@ shapiro.test(TMR_table$REFUSALS.pan)
 qqnorm(TMR_table$REFUSALS.pan); qqline(TMR_table$REFUSALS.pan)
 ```
 
-## SURVEY
+Questionnaire data
+==================
+
+## Importing the Questionnaire Data
 
 ```{r}
 ENQ_data <- read.csv2("SURVEY.csv")
 ```
 
-## Making a new matrix with TMR and SURVEY + data manipulation
+Dataset Questionnaire
+=====================
+
+Making a new matrix with TMR Consistency and Questionnaire Data
+Subsequently some columns are categories
 
 ```{r}
 DATASET1 <- merge(TMR_table, ENQ_data, by.x = "Herd", by.y = "HERD", all = FALSE)
@@ -218,11 +229,13 @@ DATASET1$MOVEMENT <- as.factor(DATASET1$MOVEMENT)
 DATASET1$EMPTY <- as.factor(DATASET1$EMPTY)
 ```
 
+## Exploring Dataset Questionnaire
+
 ```{r}
 summary(DATASET1)
 ```
 
-# Principal Component Analysis TMR
+## Principal Component Analysis TMR Consistency Data
 
 ```{r}
 TMR.pca <- prcomp(na.omit(DATASET1[,2:10]),
@@ -230,6 +243,8 @@ TMR.pca <- prcomp(na.omit(DATASET1[,2:10]),
                  scale. = TRUE) 
 print(TMR.pca)
 ```
+
+Visualising contribution of variables to PC1 and PC2 by bar charts
 
 ```{r}
 PC1PC2 <- read.csv2("PC1 and PC2 bar chart data.csv",dec = ".")
@@ -278,6 +293,7 @@ plot(TMR.pca, type = "l")
 summary(TMR.pca)
 ```
 
+Plotting variables and herds in relation to PC1 and PC2
 
 ```{r}
 biplot(TMR.pca)
@@ -285,9 +301,11 @@ biplot(TMR.pca)
 fviz_pca_var(TMR.pca, col.var = "black")
 ```
 
-# Regression Tree TMR + SURVEY
+## Regression Trees for Dataset Questionnaire
 
-## PC1
+Building regression trees to order the qualitative questionnaire variables hierarchically according to their contribution in variability of the Dataset Questionnaire
+
+### PC1
 
 ```{r}
 fit <- rpart(PREDICT_PCA$PC1 ~ SPOILAGE + SCRAPING + HOR_VERT_DRUM + AUGER + KNIVES + HAY_PROCESSING + POSITION + MIXING_START + MIXING_AFTER_LAST + LIQUID + FILLING + RPM_2 + MOVEMENT + EMPTY, data = DATASET1, method="anova")
@@ -300,7 +318,7 @@ summary(fit) # detailed summary of splits
 fancyRpartPlot(fit)
 ```
 
-## PC2
+### PC2
 
 ```{r}
 fit <- rpart(PREDICT_PCA$PC2 ~ SPOILAGE + SCRAPING + HOR_VERT_DRUM + AUGER + KNIVES + HAY_PROCESSING + POSITION + MIXING_START + MIXING_AFTER_LAST + LIQUID + FILLING + RPM_2 + MOVEMENT + EMPTY, data = DATASET1, method="anova")
@@ -313,7 +331,9 @@ summary(fit) # detailed summary of splits
 fancyRpartPlot(fit)
 ```
 
-# Factor Analysis of Mixed Data TMR + SURVEY
+## Factor Analysis of Mixed Data - Dataset Questionnaire
+
+The most important questionnaire variables from the regression tree analysis were set as active variables in the following factor analysis of mixed data (FAMD), the others were set as supplementary variables
 
 ```{r}
 datafamd <- na.omit(DATASET1[,c(2:10,        ## TMRaudit active
@@ -337,16 +357,18 @@ res.mfa <- FAMD(datafamd, graph=TRUE, sup.var=c(15:23))
 print(res.mfa)
 ```
 
+Eigenvalues of the model
+
 ```{r}
 eig.val <- get_eigenvalue(res.mfa)
 head(eig.val)
 ```
 
-## visualisations
-
 ```{r}
 fviz_screeplot(res.mfa)
 ```
+
+Visualising contribution of variables to DIM1 and DIM2 by bar charts
 
 ```{r}
 # Contribution to the first dimension
@@ -360,6 +382,8 @@ fviz_contrib(res.mfa, "var",
              axes = 2)
 ```
 
+Quantitative variables
+
 ```{r}
 quanti.var <- get_famd_var(res.mfa, "quanti.var")
 quanti.var 
@@ -370,6 +394,8 @@ fviz_famd_var(res.mfa, "quanti.var", col.var = "contrib",
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
              repel = TRUE)
 ```
+
+Making plot more readable
 
 ```{r}
 p <- fviz_famd_var(res.mfa, "quanti.var", label="none", col.var = "black")
@@ -388,6 +414,7 @@ p + annotate("text", x=.7, y=1.1, label=expression("FRESH"[TOP.MEAN]), size=3, a
 
 ```
 
+Qualitative variables
 
 ```{r}
 quali.var <- get_famd_var(res.mfa, "quali.var")
@@ -398,10 +425,11 @@ quali.var
 plot(res.mfa, choix = "quali")
 ```
 
-
 ```{r}
 fviz_famd_var(res.mfa, "quali.var", repel = TRUE, col.var = "black")
 ```
+
+Plotting herds in relation to DIM1 and DIM2 
 
 ```{r}
 fviz_famd_ind(res.mfa, col.ind = "cos2", geom=c("point", "text"),
@@ -409,13 +437,17 @@ fviz_famd_ind(res.mfa, col.ind = "cos2", geom=c("point", "text"),
              repel = TRUE, invisible = "quali.var")
 ```
 
+Coloring herds in function of their answer to questionnaire questions: position, spoilage, mixer wagon type (horizontal / vertical), hay pre-processing, mixing time after last added ingredient
+
 ```{r}
 fviz_ellipses(res.mfa, c("POSITION", "SPOILAGE", "HOR_VERT_DRUM", "HAY_PROCESSING", "MIXING_AFTER_LAST"), repel = TRUE)
 ```
 
-# MPR + ENQ
+Milk Records Data
+=================
 
-## Making a new matrix with MPR and SELECTED SURVEY VARIABLES
+## Importing the Milk Records data
+## Exploring the Milk Records data
 
 ```{r}
 MPR <- read.csv2("MPR_data.csv")
@@ -429,7 +461,11 @@ sd(MPR$FAT)
 sd(MPR$PROTEIN)
 sd(MPR$KGFP)
 sd(na.omit(MPR$AGE_YEAR))
+```
 
+Checking normality of the Milk Records data (Quantitative variables)
+
+```{r}
 par(mfrow = c(3,3))
 hist(MPR$DIM)
 hist(MPR$KGMILK)
@@ -458,6 +494,13 @@ shapiro.test(MPR$AGE_YEAR)
 qqnorm(MPR$AGE_YEAR); qqline(MPR$AGE_YEAR)
 ```
 
+Dataset Milk
+============
+
+Making a new matrix: Milk Records Data and some variables selected from the Questionnaire Dataset
+
+## Exploring Dataset Milk
+
 ```{r}
 DATASET2 <- merge(MPR, DATASET1, by.x= 'HERD', by.y= "Herd", all = FALSE)
 summary(DATASET2)
@@ -472,6 +515,7 @@ sd(DATASET2$KGFP)
 sd(na.omit(DATASET2$AGE_YEAR))
 ```
 
+## Principal Component Analysis Dataset Milk (Quantitative Variables)
 
 ```{r}
 DATASET2.pca <- prcomp(na.omit(DATASET2[,c(2:8,10,11:19)]),
@@ -486,7 +530,7 @@ summary(DATASET2.pca)
 PREDICT_PCAmilk <- as.data.frame(predict(DATASET2.pca))
 ```
 
-## visualisations
+Visualising contribution of variables to PC1 and PC2 by bar charts
 
 ```{r}
 # Contribution to PC1
@@ -500,12 +544,15 @@ fviz_contrib(DATASET2.pca, "var",
              axes = 2)
 ```
 
+Plotting variables and herds in relation to PC1 and PC2
 
 ```{r}
 biplot(DATASET2.pca)
 
 fviz_pca_var(DATASET2.pca, col.var = "black")
 ```
+
+Making plot more readable
 
 ```{r}
 p <- fviz_pca_biplot(DATASET2.pca, label="none", invisible ="ind", col.var = "black", xlim=c(-8, 8), ylim=c(-8, 8))
@@ -532,8 +579,9 @@ p <- p + annotate("text", x=-0.15, y=6.2, label=expression("FRESH"[TOP.CV]), siz
 
 p <- p + labs(x = "PC1 (21.4%)", y = "PC2 (16.3%)")
 p
-  
 ```
+
+Plotting herds in relation to PC1 and PC2
 
 ```{r}
 g <- fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), invisible = "var" , col.ind = "contrib",
@@ -542,6 +590,8 @@ g <- g + labs(x = "PC1 (21.4%)", y = "PC2 (16.3%)")
 print (g)
 
 ```
+
+Coloring herds in function of their answer to questionnaire questions: spoilage, position, mixing time after the last added ingredient, movement (different visualisations, with or without taking herd mean milk yield in account)
 
 ```{r}
 DATASETLAST <- DATASET2[-c(4,34), ]
@@ -568,7 +618,6 @@ g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1, var.
 print(g)
 ```
 
-
 ```{r}
 fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$POSITION, palette = c("#FC4E07", "#00AFBB"), addEllipses = TRUE, invisible = "var", col.var = "black")
 ```
@@ -584,7 +633,6 @@ g <- ggbiplot(DATASET2.pca, choices = c(1,2), obs.scale = 1, var.scale = 1, var.
   theme_minimal()
 print(g)
 ```
-
 
 ```{r}
 fviz_pca_biplot(DATASET2.pca, geom=c("point", "text"), habillage = DATASETLAST$MIXING_AFTER_LAST , addEllipses = TRUE, ellipse.type = "confidence", invisible = "var", label = "ind" , col.var = "black")
